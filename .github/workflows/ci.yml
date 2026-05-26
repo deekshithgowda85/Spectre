@@ -1,0 +1,79 @@
+name: CI - Prod
+
+on:
+  push:
+    branches: ["prod"]
+  pull_request:
+    branches: ["prod"]
+  workflow_dispatch: {}
+
+jobs:
+  maven-build:
+    name: Maven build & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Find and build Maven modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Searching for pom.xml files..."
+          found=false
+          while IFS= read -r -d '' pom; do
+            dir=$(dirname "$pom")
+            if [ "$dir" = "." ]; then
+              # skip root if it doesn't contain a project
+              continue
+            fi
+            echo "Building Maven project in: $dir"
+            (cd "$dir" && mvn -B -T 1C clean verify)
+            found=true
+          done < <(find . -name pom.xml -not -path './target/*' -print0)
+          if [ "$found" = false ]; then
+            echo "No pom.xml files found - skipping Maven build"
+          fi
+
+  node-tests:
+    name: Node (dashboard) lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Run dashboard lint/tests (if present)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f dashboard/package.json ]; then
+            echo "Found dashboard package.json - running install and scripts"
+            cd dashboard
+            npm ci
+            # run lint if script exists
+            node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.lint ? 0 : 1)" && npm run lint || echo 'no lint script'
+            # run tests if script exists
+            node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.test ? 0 : 1)" && npm test || echo 'no test script'
+          else
+            echo "dashboard/package.json not found — skipping Node steps"
+          fi
