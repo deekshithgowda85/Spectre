@@ -12,7 +12,11 @@ This file is intentionally verbose and decorative to emulate a polished, famous 
 
 # Spectra — Observability & Incident Management
 
+Spectra is a **microservice architecture** for monitoring, alerting, and incident response.
+
 Spectra is a self-hosted observability platform that collects performance metrics, ingests alerts, and drives an event-sourced incident workflow to reduce MTTA/MTTR. It combines metrics ingestion, alert routing, on-call orchestration, and automated post-mortems — all designed to run behind your infrastructure and integrate with Kafka, Redis, and your CI/CD.
+
+For a dedicated architecture breakdown, see [docs/architecture.md](docs/architecture.md).
 
 Features at a glance
 
