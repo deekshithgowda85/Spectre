@@ -2,6 +2,14 @@
 
 Spectra is a **microservice architecture** for observability, monitoring, alerting, and incident management. The system is split into independently deployable services that communicate through HTTP, Kafka events, Redis, and background jobs.
 
+## Implemented Core Flow
+
+The current runnable core uses the dashboard through `api-gateway`, with JWT-protected auth, incident, and dashboard APIs backed by the same Neon PostgreSQL database. The gateway routes `/api/auth/**`, `/api/incidents/**`, `/api/dashboard/**`, `/api/anomalies/**`, and `/api/ping/**` to environment-configured services. Registration and login are public; downstream services validate bearer tokens for protected operations.
+
+Core service ports default to gateway `8080`, auth `8081`, incidents `8082`, dashboard `8083`, and ping `8084`. Set `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, and a 32-character minimum `JWT_SECRET`; see the repository `.env.example` for the complete local configuration.
+
+Implemented endpoints include `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, the incident CRUD/state-transition endpoints, `GET /api/dashboard/summary`, and `GET /api/ping`.
+
 ## Overview
 
 ```mermaid
