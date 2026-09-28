@@ -1,0 +1,16 @@
+# syntax=docker/dockerfile:1.7
+FROM maven:3.9-eclipse-temurin-21 AS build
+
+ARG SERVICE_DIR
+WORKDIR /workspace
+COPY ${SERVICE_DIR}/pom.xml ${SERVICE_DIR}/pom.xml
+COPY ${SERVICE_DIR}/src ${SERVICE_DIR}/src
+RUN --mount=type=cache,id=spectra-maven,target=/root/.m2/repository \
+    mvn -B -f ${SERVICE_DIR}/pom.xml package -Dmaven.test.skip=true
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+ARG SERVICE_DIR
+COPY --from=build /workspace/${SERVICE_DIR}/target/*.jar /app/service.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/service.jar"]

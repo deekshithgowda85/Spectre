@@ -1,0 +1,158 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spectra-postgres
+    environment:
+      POSTGRES_DB: spectra
+      POSTGRES_USER: spectra
+      POSTGRES_PASSWORD: spectra
+    ports:
+      - "5433:5432"
+    volumes:
+      - spectra-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spectra -d spectra"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  service-registry:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_DIR: service-registry
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_DIR: auth-service
+    environment: &backend-environment
+      DATABASE_URL: ${SPECTRA_DATABASE_URL:-postgres:5432/spectra?sslmode=disable}
+      DATABASE_USERNAME: ${SPECTRA_DATABASE_USERNAME:-spectra}
+      DATABASE_PASSWORD: ${SPECTRA_DATABASE_PASSWORD:-spectra}
+      DATABASE_SSLMODE: disable
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me-32-characters}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-PT1H}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  incident-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_DIR: incident-service
+    environment:
+      <<: *backend-environment
+      ANOMALY_SERVICE_URL: http://anomaly-service:8085
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  dashboard-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_DIR: dashboard-service
+    environment:
+      <<: *backend-environment
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  ping-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_DIR: ping-service
+    environment:
+      <<: *backend-environment
+      PING_TARGET_0_URL: http://api-gateway:8080/actuator/health
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  anomaly-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_DIR: anomaly-service
+    environment:
+      <<: *backend-environment
+      SCRAPER_SERVICE_URL: http://scraper-service:8086
+      PING_SERVICE_URL: http://ping-service:8084
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  scraper-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_DIR: scraper-service
+    environment:
+      <<: *backend-environment
+      SCRAPER_TARGET_0_METRICS_URL: http://api-gateway:8080/actuator/prometheus
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        SERVICE_DIR: api-gateway
+    environment:
+      GATEWAY_PORT: 8080
+      DASHBOARD_ORIGIN: http://localhost:3000
+      AUTH_SERVICE_URL: http://auth-service:8081
+      INCIDENT_SERVICE_URL: http://incident-service:8082
+      DASHBOARD_SERVICE_URL: http://dashboard-service:8083
+      ANOMALY_SERVICE_URL: http://anomaly-service:8085
+      PING_SERVICE_URL: http://ping-service:8084
+      SCRAPER_SERVICE_URL: http://scraper-service:8086
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092}
+      SPRING_CLOUD_GATEWAY_DEFAULT_FILTERS_0: "DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials RETAIN_UNIQUE"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      incident-service:
+        condition: service_started
+
+  dashboard:
+    build:
+      context: ./dashboard
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+volumes:
+  spectra-postgres-data:

@@ -6,6 +6,7 @@ import com.example.ping_service.service.PingMonitorService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,8 +29,15 @@ public class PingController {
     }
 
     @GetMapping("/status/{name}")
-    TargetResponse status(@PathVariable String name) {
-        return monitor.statusFor(name);
+    TargetResponse status(@PathVariable String name, Authentication authentication) {
+        return authentication == null ? monitor.statusFor(name) : monitor.statusFor(name, authentication.getName());
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/targets")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+    void register(@org.springframework.web.bind.annotation.RequestBody TargetRequest request,
+            Authentication authentication) {
+        monitor.register(request.name(), request.url(), authentication.getName());
     }
 
     @GetMapping
@@ -41,5 +49,14 @@ public class PingController {
     ResponseEntity<Map<String, Object>> notFound(IllegalArgumentException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", "not_found", "code", "TARGET_NOT_FOUND", "detail", exception.getMessage()));
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(IllegalStateException.class)
+    ResponseEntity<Map<String, Object>> conflict(IllegalStateException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", "conflict", "code", "TARGET_EXISTS", "detail", exception.getMessage()));
+    }
+
+    record TargetRequest(String name, String url) {
     }
 }
