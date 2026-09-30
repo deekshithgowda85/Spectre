@@ -16,15 +16,6 @@ services:
       timeout: 5s
       retries: 20
 
-  service-registry:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-      args:
-        SERVICE_DIR: service-registry
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-
   auth-service:
     build:
       context: .
@@ -32,10 +23,10 @@ services:
       args:
         SERVICE_DIR: auth-service
     environment: &backend-environment
-      DATABASE_URL: ${SPECTRA_DATABASE_URL:-postgres:5432/spectra?sslmode=disable}
-      DATABASE_USERNAME: ${SPECTRA_DATABASE_USERNAME:-spectra}
-      DATABASE_PASSWORD: ${SPECTRA_DATABASE_PASSWORD:-spectra}
-      DATABASE_SSLMODE: disable
+      DATABASE_URL: ${DATABASE_URL:-postgres:5432/spectra?sslmode=disable}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-spectra}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-spectra}
+      DATABASE_SSLMODE: ${DATABASE_SSLMODE:-disable}
       JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me-32-characters}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-PT1H}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092}
@@ -66,51 +57,9 @@ services:
         SERVICE_DIR: dashboard-service
     environment:
       <<: *backend-environment
+      PROJECT_CHECK_INTERVAL_MS: ${PROJECT_CHECK_INTERVAL_MS:-60000}
     ports:
       - "8083:8083"
-    depends_on:
-      postgres:
-        condition: service_healthy
-  ping-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-      args:
-        SERVICE_DIR: ping-service
-    environment:
-      <<: *backend-environment
-      PING_TARGET_0_URL: http://api-gateway:8080/actuator/health
-    ports:
-      - "8084:8084"
-    depends_on:
-      postgres:
-        condition: service_healthy
-  anomaly-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-      args:
-        SERVICE_DIR: anomaly-service
-    environment:
-      <<: *backend-environment
-      SCRAPER_SERVICE_URL: http://scraper-service:8086
-      PING_SERVICE_URL: http://ping-service:8084
-    ports:
-      - "8085:8085"
-    depends_on:
-      postgres:
-        condition: service_healthy
-  scraper-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-      args:
-        SERVICE_DIR: scraper-service
-    environment:
-      <<: *backend-environment
-      SCRAPER_TARGET_0_METRICS_URL: http://api-gateway:8080/actuator/prometheus
-    ports:
-      - "8086:8086"
     depends_on:
       postgres:
         condition: service_healthy
@@ -126,9 +75,6 @@ services:
       AUTH_SERVICE_URL: http://auth-service:8081
       INCIDENT_SERVICE_URL: http://incident-service:8082
       DASHBOARD_SERVICE_URL: http://dashboard-service:8083
-      ANOMALY_SERVICE_URL: http://anomaly-service:8085
-      PING_SERVICE_URL: http://ping-service:8084
-      SCRAPER_SERVICE_URL: http://scraper-service:8086
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092}
       SPRING_CLOUD_GATEWAY_DEFAULT_FILTERS_0: "DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials RETAIN_UNIQUE"
     ports:

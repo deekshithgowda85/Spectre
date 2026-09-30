@@ -2,7 +2,9 @@ package com.example.dashboard_service.controller;
 
 import com.example.dashboard_service.dto.ProjectDtos.CreateRequest;
 import com.example.dashboard_service.dto.ProjectDtos.Response;
+import com.example.dashboard_service.dto.ProjectCheckDtos;
 import com.example.dashboard_service.service.ProjectService;
+import com.example.dashboard_service.service.ProjectCheckService;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -21,9 +23,11 @@ import java.util.Map;
 @RequestMapping("/api/projects")
 public class ProjectController {
     private final ProjectService projects;
+    private final ProjectCheckService projectChecks;
 
-    public ProjectController(ProjectService projects) {
+    public ProjectController(ProjectService projects, ProjectCheckService projectChecks) {
         this.projects = projects;
+        this.projectChecks = projectChecks;
     }
 
     @GetMapping
@@ -34,6 +38,12 @@ public class ProjectController {
     @GetMapping("/{id}")
     Response get(@PathVariable UUID id, Authentication authentication) {
         return projects.get(id, authentication.getName());
+    }
+
+    @GetMapping("/{id}/checks")
+    List<ProjectCheckDtos.Response> checks(@PathVariable UUID id, Authentication authentication) {
+        projects.get(id, authentication.getName());
+        return projectChecks.list(id);
     }
 
     @PostMapping

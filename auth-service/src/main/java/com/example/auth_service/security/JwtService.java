@@ -17,8 +17,8 @@ public class JwtService {
     private final SecretKey signingKey;
     private final Duration expiration;
 
-    public JwtService(@Value("${JWT_SECRET}") String secret,
-                      @Value("${JWT_EXPIRATION:PT1H}") Duration expiration) {
+    public JwtService(@Value("${app.jwt.secret}") String secret,
+            @Value("${JWT_EXPIRATION:PT1H}") Duration expiration) {
         if (secret.length() < 32) {
             throw new IllegalArgumentException("JWT_SECRET must be at least 32 characters");
         }
@@ -29,13 +29,13 @@ public class JwtService {
     public String createToken(AppUser user) {
         Instant now = Instant.now();
         return Jwts.builder()
-            .subject(user.getEmail())
-            .claim("userId", user.getId())
-            .claim("role", user.getRole().name())
-            .issuedAt(Date.from(now))
-            .expiration(Date.from(now.plus(expiration)))
-            .signWith(signingKey)
-            .compact();
+                .subject(user.getEmail())
+                .claim("userId", user.getId())
+                .claim("role", user.getRole().name())
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(expiration)))
+                .signWith(signingKey)
+                .compact();
     }
 
     public Claims parse(String token) {

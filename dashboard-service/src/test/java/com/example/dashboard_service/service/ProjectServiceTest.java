@@ -15,17 +15,22 @@ class ProjectServiceTest {
     @Test
     void normalizesAndStoresWebsiteUrl() {
         ProjectRepository repository = Mockito.mock(ProjectRepository.class);
-        ProjectService service = new ProjectService(repository);
+        AuditEventService auditEvents = Mockito.mock(AuditEventService.class);
+        ProjectCheckService projectChecks = Mockito.mock(ProjectCheckService.class);
+        ProjectService service = new ProjectService(repository, auditEvents, projectChecks);
         when(repository.existsByOwnerIdAndUrl("user", "https://example.com/")).thenReturn(false);
         when(repository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
         service.create(new CreateRequest("Portfolio", " https://example.com/ "), "user");
         verify(repository).save(Mockito.argThat(project -> project.getUrl().equals("https://example.com/")));
+        verify(auditEvents).recordProjectCreated("user", "null");
+        verify(projectChecks).check(Mockito.any());
     }
 
     @Test
     void rejectsDuplicateWebsiteForOwner() {
         ProjectRepository repository = Mockito.mock(ProjectRepository.class);
-        ProjectService service = new ProjectService(repository);
+        ProjectService service = new ProjectService(repository, Mockito.mock(AuditEventService.class),
+                Mockito.mock(ProjectCheckService.class));
         when(repository.existsByOwnerIdAndUrl("user", "https://example.com")).thenReturn(true);
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> service.create(new CreateRequest("Portfolio", "https://example.com"), "user"));
@@ -35,7 +40,8 @@ class ProjectServiceTest {
     @Test
     void scopesProjectLookupToOwner() {
         ProjectRepository repository = Mockito.mock(ProjectRepository.class);
-        ProjectService service = new ProjectService(repository);
+        ProjectService service = new ProjectService(repository, Mockito.mock(AuditEventService.class),
+                Mockito.mock(ProjectCheckService.class));
         when(repository.findByIdAndOwnerId(Mockito.any(), Mockito.eq("other"))).thenReturn(Optional.empty());
         assertThrows(IllegalArgumentException.class, () -> service.get(java.util.UUID.randomUUID(), "other"));
     }

@@ -13,9 +13,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ProjectService {
     private final ProjectRepository projects;
+    private final AuditEventService auditEvents;
+    private final ProjectCheckService projectChecks;
 
-    public ProjectService(ProjectRepository projects) {
+    public ProjectService(ProjectRepository projects, AuditEventService auditEvents,
+            ProjectCheckService projectChecks) {
         this.projects = projects;
+        this.auditEvents = auditEvents;
+        this.projectChecks = projectChecks;
     }
 
     @Transactional(readOnly = true)
@@ -35,7 +40,10 @@ public class ProjectService {
         if (projects.existsByOwnerIdAndUrl(ownerId, url)) {
             throw new IllegalStateException("This website is already being monitored.");
         }
-        return Response.from(projects.save(new Project(request.name().trim(), url, ownerId)));
+        Project project = projects.save(new Project(request.name().trim(), url, ownerId));
+        auditEvents.recordProjectCreated(ownerId, String.valueOf(project.getId()));
+        projectChecks.check(project);
+        return Response.from(project);
     }
 
     private Project require(UUID id, String ownerId) {
